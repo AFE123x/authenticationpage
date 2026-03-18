@@ -11,6 +11,7 @@ use rand::rngs::OsRng;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
@@ -56,7 +57,12 @@ async fn main() {
         .route("/login", post(handle_login))
         .route("/register", get(register_html).post(handle_register));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await;
+    let port: u16 = env::var("PORTNUM")
+        .ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(3000);
+    let address = format!("0.0.0.0:{port}");
+    let listener = tokio::net::TcpListener::bind(&address).await;
     let listener = match listener {
         Ok(listener) => listener,
         Err(e) => {
