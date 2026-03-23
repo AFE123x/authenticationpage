@@ -22,12 +22,39 @@ pub struct RegisterForm {
     pub password: String,
     pub password_confirm: String,
 }
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+pub enum UserRole {
+    User,
+    Admin,
+    Guest,
+    #[serde(other)]
+    Unknown,
+}
+
+impl Default for UserRole {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
+impl std::fmt::Display for UserRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserRole::User => write!(f, "User"),
+            UserRole::Admin => write!(f, "Admin"),
+            UserRole::Guest => write!(f, "Guest"),
+            UserRole::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
     pub username: String,
     pub email: String,
     pub password_hash: String,
+    #[serde(default)]
+    pub role: UserRole,
 }
 
 const USERS_FILE: &str = "data/users.json";

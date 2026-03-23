@@ -13,7 +13,7 @@ use tracing::{error, info};
 mod log;
 use crate::log::init_log;
 use crate::users::{
-    LoginForm, RegisterForm, User, hash_password, load_users, save_users, validate_email,
+    LoginForm, RegisterForm, User, UserRole, hash_password, load_users, save_users, validate_email,
     validate_password, validate_username, verify_password,
 }; //add Registry if needed
 
@@ -70,13 +70,16 @@ async fn handle_login(Form(form): Form<LoginForm>) -> impl IntoResponse {
             Ok(true) => {
                 info!(target: "security", "Login successful for username: {}", form.username);
                 info!("sending response with status code: {}", StatusCode::OK);
+                if user.role == UserRole::Unknown {
+                    error!(target: "security", "User '{}' has unknown role, defaulting to 'Unknown'", form.username);
+                }
                 (
                     StatusCode::OK,
                     Html(format!(
                         "<h1>Login Successful</h1>\
-                             <p>Welcome, {}!</p>\
+                             <p>Welcome, {}! Your role is {}</p>\
                              <a href='/'>Back to login</a>",
-                        form.username
+                        form.username, user.role
                     )),
                 )
             }
@@ -220,6 +223,7 @@ async fn handle_register(Form(form): Form<RegisterForm>) -> impl IntoResponse {
         username: form.username.clone(),
         email: form.email.clone(),
         password_hash,
+        role: UserRole::User,
     };
     users.insert(form.username.clone(), user);
 
