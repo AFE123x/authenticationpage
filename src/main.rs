@@ -5,6 +5,7 @@ use axum::{
     response::Html,
     routing::{get, post},
 };
+use axum_server::tls_rustls::RustlsConfig;
 
 use std::env;
 use std::sync::OnceLock;
@@ -24,6 +25,37 @@ async fn main() {
     let (_guard1, _guard2) = init_log();
     info!("general log initialized successfully");
     info!(target: "security", "security log initialized");
+
+    let dotenv_result = dotenvy::dotenv(); //load .env file if it exists
+    if let Err(e) = dotenv_result {
+        error!("Failed to load .env file: {}", e);
+    }
+
+    let certfile = env::var("CERTFILE").unwrap_or_else(|_| "cert.pem".to_string());
+    let keyfile = env::var("KEYFILE").unwrap_or_else(|_| "key.pem".to_string());
+    info!(target: "security", "Using TLS certificate file: {}", certfile);
+    info!(target: "security", "Using TLS key file: {}", keyfile);
+
+    let config = RustlsConfig::from_pem_file(&certfile, &keyfile).await;
+    let config = match config {
+        Ok(config) => config,
+        Err(e) => {
+            error!("Failed to load TLS configuration: {}", e);
+            error!(
+                target: "security",
+                "to create self-signed cert and key, you can run:\nopenssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'"
+            );
+            eprintln!(
+                "Failed to load TLS configuration: {}, you can run:\nopenssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'",
+                e
+            );
+            panic!(
+                "error occurred: read logs/general.log or security.log for more details: {}",
+                e
+            );
+        }
+    };
+
     let app = Router::new()
         .route("/", get(login_html))
         .route("/login", post(handle_login))
@@ -33,21 +65,26 @@ async fn main() {
         .ok()
         .and_then(|s| s.parse::<u16>().ok())
         .unwrap_or(3000);
-    let address = format!("0.0.0.0:{port}");
-    let listener = tokio::net::TcpListener::bind(&address).await;
-    let listener = match listener {
-        Ok(listener) => listener,
+
+    let address: std::net::SocketAddr = match format!("0.0.0.0:{port}").parse() {
+        Ok(addr) => addr,
         Err(e) => {
-            error!("Failed to bind to port 3000: {}", e);
+            error!("Failed to parse server address from port {}: {}", port, e);
             panic!(
                 "error occurred: read logs/general.log or security.log for more details: {}",
                 e
             );
         }
     };
-    println!("Server running on http://localhost:3000");
-    let axum_result = axum::serve(listener, app).await;
-    if let Err(e) = axum_result {
+
+    info!("Server running on https://{address}");
+    println!("Server running on https://{address}");
+
+    // Use axum_server with Rustls — this replaces TcpListener + axum::serve
+    if let Err(e) = axum_server::bind_rustls(address, config)
+        .serve(app.into_make_service())
+        .await
+    {
         error!("Server error: {}", e);
         panic!(
             "error occurred: read logs/general.log or security.log for more details: {}",

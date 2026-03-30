@@ -3,3 +3,5 @@ logs/general.log
 logs/security.log
 data/sessions.json
 data/users.json
+*.pem
+.env
