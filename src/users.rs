@@ -13,6 +13,7 @@ use tracing::error;
 pub struct LoginForm {
     pub username: String,
     pub password: String,
+    //Put the amount of login attempts so far here
 }
 
 #[derive(Deserialize)]
