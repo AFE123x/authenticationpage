@@ -8,7 +8,8 @@ use axum::{
 use axum_server::tls_rustls::RustlsConfig;
 
 use std::env;
-use std::sync::OnceLock;
+use std::sync::{OnceLock, Arc};
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 mod log;
@@ -17,6 +18,8 @@ use crate::users::{
     LoginForm, RegisterForm, User, UserRole, hash_password, load_users, save_users, validate_email,
     validate_password, validate_username, verify_password,
 }; //add Registry if needed
+
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 
 mod users;
 
@@ -56,9 +59,17 @@ async fn main() {
         }
     };
 
+    let login_governor_conf = Arc::new(
+    GovernorConfigBuilder::default()
+        .period(Duration::from_secs(6)) // 1 token every 6 seconds
+        .burst_size(10)                 // allow up to 10 requests at once
+        .finish()
+        .unwrap(),
+    );
+
     let app = Router::new()
         .route("/", get(login_html))
-        .route("/login", post(handle_login))
+        .route("/login", post(handle_login).layer(GovernorLayer::new(login_governor_conf.clone())),)
         .route("/register", get(register_html).post(handle_register));
 
     let port: u16 = env::var("PORTNUM")
@@ -82,7 +93,7 @@ async fn main() {
 
     // Use axum_server with Rustls — this replaces TcpListener + axum::serve
     if let Err(e) = axum_server::bind_rustls(address, config)
-        .serve(app.into_make_service())
+        .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
         .await
     {
         error!("Server error: {}", e);
@@ -94,12 +105,6 @@ async fn main() {
 }
 
 async fn handle_login(Form(form): Form<LoginForm>) -> impl IntoResponse {
-    info!(target: "security", "Login attempt for username: {}", form.username);
-
-    // Ensure we don't read the users file while a registration is writing it.
-    let lock = USER_FILE_LOCK.get_or_init(|| Mutex::new(()));
-    let _guard = lock.lock().await;
-
     let users = load_users();
 
     match users.get(&form.username) {
