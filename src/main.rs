@@ -105,6 +105,8 @@ async fn main() {
 }
 
 async fn handle_login(Form(form): Form<LoginForm>) -> impl IntoResponse {
+    let user_lock = USER_FILE_LOCK.get_or_init(|| Mutex::new(()));
+    let _guard = user_lock.lock().await;
     let users = load_users();
 
     match users.get(&form.username) {
