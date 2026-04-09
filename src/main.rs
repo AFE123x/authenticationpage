@@ -181,15 +181,7 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
                 );
                 info!(target: "security", "Login successful for username: {}", form.username);
 
-                let body = Html(format!(
-                    "<h1>Login Successful</h1><p>Welcome, {}! Your role is {}</p>\
-                    <form action='/logout' method='post' style='margin-top: 20px;'>\
-                        <button type='submit'>Logout</button>\
-                    </form>\
-                    <a href='/'>Back</a>",
-                    form.username, user.role
-                ));
-                (jar.add(cookie), body).into_response()
+                (jar.add(cookie), Redirect::to("/")).into_response()
             }
             Ok(false) => {
                 // ← warn instead of info — invalid credentials are noteworthy
