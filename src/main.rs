@@ -73,7 +73,8 @@ async fn main() {
             "/login",
             post(handle_login).layer(GovernorLayer::new(login_governor_conf.clone())),
         )
-        .route("/register", get(register_html).post(handle_register));
+        .route("/register", get(register_html).post(handle_register))
+        .route("/resetpassword", get(reset_password_html).post(handle_reset_password));
 
     let port: u16 = env::var("PORTNUM")
         .ok()
@@ -301,6 +302,12 @@ async fn handle_register(Form(form): Form<RegisterForm>) -> impl IntoResponse {
     )
 }
 
+async fn handle_reset_password(Form(form): Form<RegisterForm>) -> impl IntoResponse {
+    info!(target: "security", "Resetting password for accounted associated with the email address: {}", form.email);
+
+
+}
+
 /* handler for login page */
 async fn login_html() -> Html<String> {
     info!("Serving login.html to client");
@@ -312,5 +319,11 @@ async fn login_html() -> Html<String> {
 async fn register_html() -> Html<String> {
     info!("Serving register.html to client");
     let contents = include_str!("../templates/register.html").to_string();
+    Html(contents)
+}
+
+async fn reset_password_html() -> Html<String> {
+    info!("Serving resetpassword.html to client");
+    let contents = include_str!("../templates/resetpassword.html").to_string();
     Html(contents)
 }
