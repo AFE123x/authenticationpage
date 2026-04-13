@@ -1,4 +1,5 @@
-use axum::http::StatusCode;
+use argon2::password_hash;
+use axum::http::{StatusCode, status};
 use axum::response::{IntoResponse, Redirect};
 use axum::{
     Form, Router,
@@ -16,8 +17,8 @@ use tracing::{error, info, warn};
 mod log;
 use crate::log::init_log;
 use crate::users::{
-    LoginForm, RegisterForm, User, UserRole, hash_password, load_users, save_users, validate_email,
-    validate_password, validate_username, verify_password,
+    LoginForm, RegisterForm, ResetPassword, User, UserRole, hash_password, load_users, save_users,
+    validate_email, validate_password, validate_username, verify_password,
 };
 
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
@@ -96,6 +97,10 @@ async fn main() {
             post(handle_login).layer(GovernorLayer::new(login_governor_conf.clone())),
         )
         .route("/register", get(register_html).post(handle_register))
+        .route(
+            "/resetpassword",
+            get(reset_password_html).post(handle_reset_password),
+        )
         .route("/logout", post(handle_logout));
 
     let port: u16 = env::var("PORTNUM")
@@ -143,7 +148,7 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
             // Only auto-login if the session's user matches the submitted username
             if session.user_id == form.username {
                 info!(target: "security", "User '{}' auto-login successful via valid session cookie", session.user_id);
-                return (jar,  Redirect::to("/")).into_response();
+                return (jar, Redirect::to("/")).into_response();
             } else {
                 warn!(target: "security", "Session cookie exists for user '{}' but login attempt submitted for different user '{}', proceeding with full authentication", session.user_id, form.username);
             }
@@ -443,6 +448,49 @@ async fn handle_logout(jar: CookieJar) -> impl IntoResponse {
     )
 }
 
+async fn handle_reset_password(Form(form): Form<ResetPassword>) -> impl IntoResponse {
+    info!(target: "security", "Attempting to reset password for account associated with the username: {}", form.username);
+
+    if form.newpassword != form.confirmnewpassword {
+        return (StatusCode::BAD_REQUEST, "New passwords do not match").into_response();
+    }
+
+    if let Err(e) = validate_password(&form.newpassword) {
+        return (StatusCode::BAD_REQUEST, e).into_response();
+    }
+
+    let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+    let _guard = lock.lock().await;
+
+    let mut users = load_users();
+
+    if let Some(user) = users.get_mut(&form.username) {
+        match verify_password(&form.currentpassword, &user.password_hash) {
+            Ok(true) => match hash_password(&form.newpassword) {
+                Ok(new_hash) => {
+                    user.password_hash = new_hash;
+
+                    if let Err(e) = save_users(&users) {
+                        error!("Saving user file failed: {}", e);
+                        return (StatusCode::INTERNAL_SERVER_ERROR, "Server error").into_response();
+                    }
+
+                    info!("Password updates successful for {}", form.username);
+                    Redirect::to("/").into_response()
+                }
+                Err(_) => {
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Hashing password failed").into_response()
+                }
+            },
+            Ok(false) => (StatusCode::UNAUTHORIZED, "Currect password incorrect").into_response(),
+            Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Verification error").into_response(),
+        }
+    } else {
+        (StatusCode::NOT_FOUND, "User not found").into_response()
+    }
+}
+
+/* handler for login page */
 async fn login_html(jar: CookieJar) -> impl IntoResponse {
     info!("GET / — serving login page");
 
@@ -486,6 +534,11 @@ async fn register_html() -> Html<String> {
     Html(contents)
 }
 
+async fn reset_password_html() -> Html<String> {
+    info!("Serving resetpassword.html to client");
+    let contents = include_str!("../templates/resetpassword.html").to_string();
+    Html(contents)
+}
 #[cfg(test)]
 mod tests {
     use rand::random;
