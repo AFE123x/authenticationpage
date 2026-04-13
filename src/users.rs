@@ -97,8 +97,16 @@ pub fn load_users() -> HashMap<String, User> {
 pub fn save_users(users: &HashMap<String, User>) -> Result<(), std::io::Error> {
     tokio::task::block_in_place(|| {
         let json = serde_json::to_string_pretty(users)?;
-        // Write to a temporary file first, then move it into place.
-        let tmp_path = format!("{}.tmp", USERS_FILE); //consider putting this in /tmp≥
+
+        // Use a unique temporary file to avoid conflicts with concurrent saves
+        use rand::{Rng, distributions::Alphanumeric};
+        let tmp_suffix: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect();
+        let tmp_path = format!("{}.{}.tmp", USERS_FILE, tmp_suffix);
+
         fs::write(&tmp_path, json)?;
 
         // On Windows, std::fs::rename fails if the destination already exists.
