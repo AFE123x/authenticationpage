@@ -1,5 +1,6 @@
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use argon2::password_hash;
+use axum::http::{StatusCode, status};
+use axum::response::{IntoResponse, Redirect};
 use axum::{
     Form, Router,
     response::Html,
@@ -15,8 +16,7 @@ use tracing::{error, info};
 mod log;
 use crate::log::init_log;
 use crate::users::{
-    LoginForm, RegisterForm, User, UserRole, hash_password, load_users, save_users, validate_email,
-    validate_password, validate_username, verify_password,
+    LoginForm, RegisterForm, ResetPassword, User, UserRole, hash_password, load_users, save_users, validate_email, validate_password, validate_username, verify_password
 }; //add Registry if needed
 
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
@@ -302,10 +302,46 @@ async fn handle_register(Form(form): Form<RegisterForm>) -> impl IntoResponse {
     )
 }
 
-async fn handle_reset_password(Form(form): Form<RegisterForm>) -> impl IntoResponse {
-    info!(target: "security", "Resetting password for accounted associated with the email address: {}", form.email);
+async fn handle_reset_password(Form(form): Form<ResetPassword>) -> impl IntoResponse {
+    info!(target: "security", "Attempting to reset password for account associated with the username: {}", form.username);
 
+    if form.newpassword != form.confirmnewpassword {
+        return (StatusCode::BAD_REQUEST, "New passwords do not match").into_response();
+    }
 
+    if let Err(e) = validate_password(&form.newpassword) {
+        return (StatusCode::BAD_REQUEST, e).into_response();
+    }
+
+    let lock = USER_FILE_LOCK.get_or_init(|| Mutex::new(()));
+    let _guard = lock.lock().await;
+
+    let mut users = load_users();
+
+    if let Some(user) = users.get_mut(&form.username) {
+        match verify_password(&form.currentpassword, &user.password_hash) {
+            Ok(true) => {
+                match hash_password(&form.newpassword) {
+                    Ok(new_hash) => {
+                        user.password_hash = new_hash;
+                        
+                        if let Err(e) = save_users(&users) {
+                            error!("Saving user file failed: {}", e);
+                            return (StatusCode::INTERNAL_SERVER_ERROR, "Server error").into_response();
+                        }
+                        
+                        info!("Password updates successful for {}", form.username);
+                        Redirect::to("/").into_response()
+                    }
+                    Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Hashing password failed").into_response(),
+                }
+            }
+            Ok(false) => (StatusCode::UNAUTHORIZED, "Currect password incorrect").into_response(),
+            Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Verification error").into_response(),
+        }
+    } else {
+        (StatusCode::NOT_FOUND, "User not found").into_response()
+    }
 }
 
 /* handler for login page */
