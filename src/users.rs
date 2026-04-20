@@ -22,6 +22,15 @@ pub struct RegisterForm {
     pub password: String,
     pub password_confirm: String,
 }
+
+#[derive(Deserialize)]
+pub struct ResetPassword {
+    pub username: String,
+    pub currentpassword: String,
+    pub newpassword: String,
+    pub confirmnewpassword: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub enum UserRole {
     User,
