@@ -1,6 +1,5 @@
-use argon2::password_hash;
 use axum::extract::DefaultBodyLimit;
-use axum::http::{StatusCode, status};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
 use axum::{
     Form, Json, Router,
@@ -136,9 +135,10 @@ fn sanitize_log_str(s: &str) -> String {
 
 #[tokio::main]
 async fn main() {
-    let (_guard1, _guard2) = init_log();
+    let (_guard1, _guard2, _guard3) = init_log();
     info!("general log initialized successfully");
     info!(target: "security", "security log initialized");
+    info!(target: "access", "access log initialized");
 
     let dotenv_result = dotenvy::dotenv();
     if let Err(e) = dotenv_result {
@@ -228,7 +228,16 @@ async fn main() {
             post(api_upload_document).layer(DefaultBodyLimit::max(100 * 1024 * 1024)),
         )
         .route("/api/documents/{id}", delete(api_delete_document))
-        .route("/api/documents/{id}/download", get(api_download_document));
+        .route("/api/documents/{id}/download", get(api_download_document))
+        .route(
+            "/api/documents/{id}/share",
+            post(api_share_document).delete(api_unshare_document),
+        )
+        .route(
+            "/api/documents/{id}/update",
+            post(api_update_document).layer(DefaultBodyLimit::max(100 * 1024 * 1024)),
+        )
+        .route("/api/documents/{id}/audit", get(api_get_audit_log));
 
     let port: u16 = env::var("PORTNUM")
         .ok()
@@ -710,7 +719,33 @@ async fn api_list_documents(jar: CookieJar) -> impl IntoResponse {
 
         if let Some(session) = session_manager.validate_session(token).await {
             let documents = get_user_documents(&session.user_id).await;
-            let response: Vec<DocumentResponse> = documents.into_iter().map(Into::into).collect();
+            let response: Vec<DocumentResponse> = documents
+                .into_iter()
+                .map(|doc| {
+                    let is_owner = doc.uploaded_by == session.user_id;
+
+                    // Construct response manually to avoid cloning audit_log
+                    DocumentResponse {
+                        id: doc.id,
+                        filename: doc.filename,
+                        size: doc.size,
+                        uploaded_at: doc.uploaded_at,
+                        uploaded_by: doc.uploaded_by,
+                        version: doc.version,
+                        audit_log: None, // Always redact in list view
+                        permissions: if is_owner {
+                            Some(doc.permissions)
+                        } else {
+                            // Non-owners only see their own permission
+                            let mut limited_perms = std::collections::HashMap::new();
+                            if let Some(role) = doc.permissions.get(&session.user_id) {
+                                limited_perms.insert(session.user_id.clone(), role.clone());
+                            }
+                            Some(limited_perms)
+                        },
+                    }
+                })
+                .collect();
             return (StatusCode::OK, Json(response)).into_response();
         }
     }
@@ -722,6 +757,30 @@ async fn api_list_documents(jar: CookieJar) -> impl IntoResponse {
         .into_response()
 }
 
+async fn api_get_audit_log(jar: CookieJar, AxumPath(id): AxumPath<String>) -> impl IntoResponse {
+    if let Some(session_cookie) = jar.get("session_token") {
+        let token = session_cookie.value();
+        let session_manager = SessionManager::new();
+
+        if let Some(session) = session_manager.validate_session(token).await {
+            if let Some(document) = get_document_by_id(&id).await {
+                // Only the owner can see the audit log
+                if document.uploaded_by != session.user_id {
+                    return (
+                        StatusCode::FORBIDDEN,
+                        "Only the owner can view the audit log".to_string(),
+                    )
+                        .into_response();
+                }
+
+                return (StatusCode::OK, Json(document.audit_log)).into_response();
+            }
+            return (StatusCode::NOT_FOUND, "Document not found".to_string()).into_response();
+        }
+    }
+    (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()).into_response()
+}
+
 async fn api_upload_document(jar: CookieJar, mut multipart: Multipart) -> impl IntoResponse {
     if let Some(session_cookie) = jar.get("session_token") {
         let token = session_cookie.value();
@@ -731,8 +790,10 @@ async fn api_upload_document(jar: CookieJar, mut multipart: Multipart) -> impl I
             info!("Upload attempt by user: {}", session.user_id);
 
             loop {
-                match multipart.next_field().await {
-                    Ok(Some(field)) => {
+                let field_result =
+                    tokio::time::timeout(Duration::from_secs(30), multipart.next_field()).await;
+                match field_result {
+                    Ok(Ok(Some(field))) => {
                         let field_name = field
                             .name()
                             .map(|n| n.to_string())
@@ -856,19 +917,27 @@ async fn api_upload_document(jar: CookieJar, mut multipart: Multipart) -> impl I
                             }
                         }
                     }
-                    Ok(None) => {
+                    Ok(Ok(None)) => {
                         warn!(
                             "Upload failed: Multipart stream ended without finding a 'file' field for user {}",
                             session.user_id
                         );
                         break;
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         warn!(
                             "Upload failed: Multipart stream error for user {}: {}",
                             session.user_id, e
                         );
                         return (StatusCode::BAD_REQUEST, format!("Multipart error: {}", e))
+                            .into_response();
+                    }
+                    Err(_) => {
+                        warn!(
+                            "Upload failed: Timeout while waiting for multipart field from user {}",
+                            session.user_id
+                        );
+                        return (StatusCode::REQUEST_TIMEOUT, "Request timed out".to_string())
                             .into_response();
                     }
                 }
@@ -886,6 +955,386 @@ async fn api_upload_document(jar: CookieJar, mut multipart: Multipart) -> impl I
     (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()).into_response()
 }
 
+async fn api_update_document(
+    jar: CookieJar,
+    AxumPath(id): AxumPath<String>,
+    mut multipart: Multipart,
+) -> impl IntoResponse {
+    if let Some(session_cookie) = jar.get("session_token") {
+        let token = session_cookie.value();
+        let session_manager = SessionManager::new();
+
+        if let Some(session) = session_manager.validate_session(token).await {
+            // First check permissions without a long-held write lock
+            if let Some(document) = get_document_by_id(&id).await {
+                let is_owner = document.uploaded_by == session.user_id;
+                let is_editor =
+                    document.permissions.get(&session.user_id) == Some(&"editor".to_string());
+
+                if !is_owner && !is_editor {
+                    return (
+                        StatusCode::FORBIDDEN,
+                        "Only the owner or an editor can update this document".to_string(),
+                    )
+                        .into_response();
+                }
+
+                info!(
+                    "Update attempt for document {} by user: {}",
+                    id, session.user_id
+                );
+
+                loop {
+                    let field_result =
+                        tokio::time::timeout(Duration::from_secs(30), multipart.next_field()).await;
+                    match field_result {
+                        Ok(Ok(Some(field))) => {
+                            if field.name() == Some("file") {
+                                let filename =
+                                    field.file_name().unwrap_or(&document.filename).to_string();
+
+                                match field.bytes().await {
+                                    Ok(bytes) => {
+                                        let encrypted_bytes = match encrypt_data(&bytes) {
+                                            Ok(enc) => enc,
+                                            Err(e) => {
+                                                return (StatusCode::INTERNAL_SERVER_ERROR, e)
+                                                    .into_response();
+                                            }
+                                        };
+
+                                        // Write to a temporary file first to ensure atomicity
+                                        let temp_path = format!("{}.tmp", document.path);
+                                        if let Err(e) =
+                                            tokio::fs::write(&temp_path, &encrypted_bytes).await
+                                        {
+                                            error!(
+                                                "Failed to write temporary file during update: {}",
+                                                e
+                                            );
+                                            return (
+                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                format!("Failed to save file: {}", e),
+                                            )
+                                                .into_response();
+                                        }
+
+                                        // On Windows, std::fs::rename fails if the destination already exists.
+                                        // We attempt to remove it first.
+                                        if std::path::Path::new(&document.path).exists() {
+                                            if let Err(e) = tokio::fs::remove_file(&document.path).await {
+                                                warn!(
+                                                    "Could not remove existing document file '{}' before rename: {}. Attempting rename anyway.",
+                                                    document.path, e
+                                                );
+                                            }
+                                        }
+
+                                        // Swap files to ensure disk state is updated
+                                        if let Err(e) =
+                                            tokio::fs::rename(&temp_path, &document.path).await
+                                        {
+                                            error!(
+                                                "Failed to finalize file update for document {}: {}",
+                                                id, e
+                                            );
+                                            // Clean up temp file
+                                            let _ = tokio::fs::remove_file(&temp_path).await;
+                                            return (
+                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                format!("Failed to finalize file update: {}", e),
+                                            )
+                                                .into_response();
+                                        }
+
+                                        // Now update metadata atomically
+                                        let update_result =
+                                            crate::documents::with_document_mut(&id, |doc| {
+                                                let now = chrono::Utc::now();
+                                                doc.filename = filename.clone();
+                                                doc.size = bytes.len() as u64;
+                                                doc.uploaded_at = now;
+                                                doc.version += 1;
+
+                                                let entry = format!(
+                                                    "[{}] User {} uploaded new version {}",
+                                                    now.to_rfc3339(),
+                                                    session.user_id,
+                                                    doc.version
+                                                );
+                                                info!(target: "access", "{}", entry);
+                                                doc.audit_log.push(entry);
+                                                if doc.audit_log.len() > 50 {
+                                                    doc.audit_log.remove(0);
+                                                }
+                                                doc.version
+                                            })
+                                            .await;
+
+                                        let new_version = match update_result {
+                                            Ok(v) => v,
+                                            Err(e) => {
+                                                error!(
+                                                    "Failed to update metadata for document {}: {}",
+                                                    id, e
+                                                );
+                                                // File swapped but metadata update failed
+                                                return (
+                                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                                    format!("File updated but metadata update failed: {}", e),
+                                                )
+                                                    .into_response();
+                                            }
+                                        };
+
+                                        info!(
+                                            "Document {} successfully updated to version {} by {}",
+                                            id,
+                                            new_version,
+                                            session.user_id
+                                        );
+                                        return (
+                                            StatusCode::OK,
+                                            Json(
+                                                serde_json::json!({"id": id, "filename": filename}),
+                                            ),
+                                        )
+                                            .into_response();
+                                    }
+                                    Err(e) => {
+                                        return (
+                                            StatusCode::BAD_REQUEST,
+                                            format!("Failed to read file: {}", e),
+                                        )
+                                            .into_response();
+                                    }
+                                }
+                            }
+                        }
+                        Ok(Ok(None)) => break,
+                        Ok(Err(e)) => {
+                            return (StatusCode::BAD_REQUEST, format!("Multipart error: {}", e))
+                                .into_response();
+                        }
+                        Err(_) => {
+                            warn!(
+                                "Update failed: Timeout while waiting for multipart field for document {} from user {}",
+                                id, session.user_id
+                            );
+                            return (StatusCode::REQUEST_TIMEOUT, "Request timed out".to_string())
+                                .into_response();
+                        }
+                    }
+                }
+                return (StatusCode::BAD_REQUEST, "No file field found".to_string())
+                    .into_response();
+            }
+            return (StatusCode::NOT_FOUND, "Document not found".to_string()).into_response();
+        }
+    }
+    (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()).into_response()
+}
+
+#[derive(Deserialize)]
+struct ShareForm {
+    target_username: String,
+    role: String,
+}
+
+async fn api_share_document(
+    jar: CookieJar,
+    AxumPath(id): AxumPath<String>,
+    Json(payload): Json<ShareForm>,
+) -> impl IntoResponse {
+    if let Some(session_cookie) = jar.get("session_token") {
+        let token = session_cookie.value();
+        let session_manager = SessionManager::new();
+
+        if let Some(session) = session_manager.validate_session(token).await {
+            // Validate role
+            let role = payload.role.to_lowercase();
+            if role != "viewer" && role != "editor" {
+                warn!(target: "security", "Invalid role share attempt: '{}' for document {} by user {}", payload.role, id, session.user_id);
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "Invalid role. Must be 'viewer' or 'editor'".to_string(),
+                )
+                    .into_response();
+            }
+
+            // Prevent sharing with self
+            if payload.target_username == session.user_id {
+                warn!(target: "security", "Self-share attempt for document {} by user {}", id, session.user_id);
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "You cannot share a document with yourself".to_string(),
+                )
+                    .into_response();
+            }
+
+            // Verify target user exists
+            let users = {
+                let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+                let _user_file_guard = lock.lock().await;
+                load_users()
+            };
+            if !users.contains_key(&payload.target_username) {
+                info!(
+                    "Share failed: target user '{}' not found (requested by {})",
+                    payload.target_username, session.user_id
+                );
+                return (
+                    StatusCode::NOT_FOUND,
+                    format!("User '{}' not found", payload.target_username),
+                )
+                    .into_response();
+            }
+
+            let share_result = crate::documents::with_document_mut(&id, |doc| {
+                // Only the owner can share
+                if doc.uploaded_by != session.user_id {
+                    return Err((
+                        StatusCode::FORBIDDEN,
+                        "Only the owner can share this document".to_string(),
+                    ));
+                }
+
+                doc.permissions
+                    .insert(payload.target_username.clone(), role.clone());
+
+                let entry = format!(
+                    "[{}] User {} shared document with {} as {}",
+                    chrono::Utc::now().to_rfc3339(),
+                    session.user_id,
+                    payload.target_username,
+                    role
+                );
+                info!(target: "access", "{}", entry);
+                doc.audit_log.push(entry);
+                if doc.audit_log.len() > 50 {
+                    doc.audit_log.remove(0);
+                }
+
+                Ok(())
+            })
+            .await;
+
+            return match share_result {
+                Ok(Ok(_)) => {
+                    info!(
+                        "Document {} shared with {} as {} by {}",
+                        id, payload.target_username, role, session.user_id
+                    );
+                    (StatusCode::OK, "Document shared successfully".to_string()).into_response()
+                }
+                Ok(Err((status, msg))) => {
+                    warn!(target: "security", "Unauthorized share attempt for document {} by user {}: {}", id, session.user_id, msg);
+                    (status, msg).into_response()
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to update document metadata for sharing (doc: {}, target: {}): {}",
+                        id, payload.target_username, e
+                    );
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to update metadata".to_string(),
+                    )
+                        .into_response()
+                }
+            };
+        }
+    }
+
+    warn!(target: "security", "Unauthorized access attempt to share API: invalid or missing session");
+    (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()).into_response()
+}
+
+#[derive(Deserialize)]
+struct UnshareForm {
+    target_username: String,
+}
+
+async fn api_unshare_document(
+    jar: CookieJar,
+    AxumPath(id): AxumPath<String>,
+    Json(payload): Json<UnshareForm>,
+) -> impl IntoResponse {
+    if let Some(session_cookie) = jar.get("session_token") {
+        let token = session_cookie.value();
+        let session_manager = SessionManager::new();
+
+        if let Some(session) = session_manager.validate_session(token).await {
+            let unshare_result = crate::documents::with_document_mut(&id, |doc| {
+                // Only the owner can unshare
+                if doc.uploaded_by != session.user_id {
+                    return Err((
+                        StatusCode::FORBIDDEN,
+                        "Only the owner can manage access to this document".to_string(),
+                    ));
+                }
+
+                if doc.permissions.remove(&payload.target_username).is_some() {
+                    let entry = format!(
+                        "[{}] User {} revoked access for {}",
+                        chrono::Utc::now().to_rfc3339(),
+                        session.user_id,
+                        payload.target_username
+                    );
+                    info!(target: "access", "{}", entry);
+                    doc.audit_log.push(entry);
+                    if doc.audit_log.len() > 50 {
+                        doc.audit_log.remove(0);
+                    }
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            })
+            .await;
+
+            return match unshare_result {
+                Ok(Ok(true)) => {
+                    info!(
+                        "Access removed for {} from document {} by {}",
+                        payload.target_username, id, session.user_id
+                    );
+                    (StatusCode::OK, "Access removed successfully".to_string()).into_response()
+                }
+                Ok(Ok(false)) => {
+                    info!(
+                        "Unshare failed: user '{}' did not have access to document {} (requested by {})",
+                        payload.target_username, id, session.user_id
+                    );
+                    (
+                        StatusCode::NOT_FOUND,
+                        "User did not have access".to_string(),
+                    )
+                        .into_response()
+                }
+                Ok(Err((status, msg))) => {
+                    warn!(target: "security", "Unauthorized unshare attempt for document {} by user {}: {}", id, session.user_id, msg);
+                    (status, msg).into_response()
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to update document metadata for unsharing (doc: {}, target: {}): {}",
+                        id, payload.target_username, e
+                    );
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to update metadata".to_string(),
+                    )
+                        .into_response()
+                }
+            };
+        }
+    }
+
+    warn!(target: "security", "Unauthorized access attempt to unshare API: invalid or missing session");
+    (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()).into_response()
+}
+
 async fn api_download_document(
     jar: CookieJar,
     AxumPath(id): AxumPath<String>,
@@ -894,62 +1343,107 @@ async fn api_download_document(
         let token = session_cookie.value();
         let session_manager = SessionManager::new();
 
-        if let Some(_session) = session_manager.validate_session(token).await {
-            if let Some(document) = get_document_by_id(&id).await {
-                if document.uploaded_by != _session.user_id {
-                    return (StatusCode::FORBIDDEN, "Access denied").into_response();
+        if let Some(session) = session_manager.validate_session(token).await {
+            // First check authorization and get path
+            let auth_check = if let Some(doc) = get_document_by_id(&id).await {
+                if doc.uploaded_by == session.user_id
+                    || doc.permissions.contains_key(&session.user_id)
+                {
+                    Ok((doc.path.clone(), doc.filename.clone()))
+                } else {
+                    Err(StatusCode::FORBIDDEN)
                 }
+            } else {
+                Err(StatusCode::NOT_FOUND)
+            };
 
-                match tokio::fs::read(&document.path).await {
-                    Ok(encrypted_contents) => match decrypt_data(&encrypted_contents) {
-                        Ok(contents) => {
-                            info!(
-                                "Document downloaded: {} by {}",
-                                sanitize_log_str(&document.filename),
-                                _session.user_id
-                            );
+            let (path, filename) = match auth_check {
+                Ok(res) => res,
+                Err(status) => return (status, "Access denied").into_response(),
+            };
 
-                            let sanitized_simple = sanitize_filename(&document.filename);
-                            let encoded_utf8 = percent_encode(&document.filename);
-                            let content_disposition = format!(
-                                r#"attachment; filename="{}"; filename*=UTF-8''{}"#,
-                                sanitized_simple, encoded_utf8
-                            );
-
-                            return (
-                                StatusCode::OK,
-                                [("Content-Disposition", content_disposition)],
-                                contents,
-                            )
-                                .into_response();
+            // Read the file from disk (IO-intensive, do outside the lock)
+            let encrypted_contents = match tokio::fs::read(&path).await {
+                Ok(contents) => contents,
+                Err(e) => {
+                    error!("Failed to read document file: {}", e);
+                    return match e.kind() {
+                        std::io::ErrorKind::NotFound => {
+                            (StatusCode::NOT_FOUND, "Document not found".to_string())
                         }
-                        Err(e) => {
-                            error!("Failed to decrypt document: {}", e);
-                            return (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                "Failed to decrypt file".to_string(),
-                            )
-                                .into_response();
-                        }
-                    },
-                    Err(e) => {
-                        error!("Failed to read document file: {}", e);
-                        return match e.kind() {
-                            std::io::ErrorKind::NotFound => {
-                                (StatusCode::NOT_FOUND, "Document not found".to_string())
-                                    .into_response()
-                            }
-                            _ => (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                "Failed to read file".to_string(),
-                            )
-                                .into_response(),
-                        };
+                        _ => (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to read file".to_string(),
+                        ),
                     }
+                    .into_response();
                 }
-            }
+            };
 
-            return (StatusCode::NOT_FOUND, "Document not found".to_string()).into_response();
+            // Decrypt contents
+            let contents = match decrypt_data(&encrypted_contents) {
+                Ok(contents) => contents,
+                Err(e) => {
+                    error!("Failed to decrypt document: {}", e);
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to decrypt file".to_string(),
+                    )
+                        .into_response();
+                }
+            };
+
+            // 1. Permanent Audit: Log to access.log immediately (primary security record)
+            let timestamp = chrono::Utc::now().to_rfc3339();
+            info!(
+                target: "access",
+                "[{}] User {} downloaded version of document {}",
+                timestamp, session.user_id, id
+            );
+
+            // 2. Metadata Audit: Best-effort update to the inline audit log (for UI display)
+            let audit_id = id.clone();
+            let audit_user = session.user_id.clone();
+            tokio::spawn(async move {
+                let res = crate::documents::with_document_mut(&audit_id, |doc| {
+                    let entry = format!(
+                        "[{}] User {} downloaded version {}",
+                        chrono::Utc::now().to_rfc3339(),
+                        audit_user,
+                        doc.version
+                    );
+                    doc.audit_log.push(entry);
+                    if doc.audit_log.len() > 50 {
+                        doc.audit_log.remove(0);
+                    }
+                })
+                .await;
+
+                if let Err(e) = res {
+                    error!(target: "security", "Best-effort audit log update failed for document {}: {}", audit_id, e);
+                }
+            });
+
+            // 3. Finalize Response: Serve the file regardless of metadata update outcome
+            info!(
+                "Document download successful: {} by {}",
+                sanitize_log_str(&filename),
+                session.user_id
+            );
+
+            let sanitized_simple = sanitize_filename(&filename);
+            let encoded_utf8 = percent_encode(&filename);
+            let content_disposition = format!(
+                r#"attachment; filename="{}"; filename*=UTF-8''{}"#,
+                sanitized_simple, encoded_utf8
+            );
+
+            return (
+                StatusCode::OK,
+                [("Content-Disposition", content_disposition)],
+                contents,
+            )
+                .into_response();
         }
     }
 

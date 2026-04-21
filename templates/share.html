@@ -10,19 +10,16 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
-        
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
-        
         header {
             display: flex;
             justify-content: space-between;
@@ -33,18 +30,15 @@
             margin-bottom: 30px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
         header h1 {
             color: #333;
             font-size: 28px;
         }
-        
         header .user-info {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
         .user-badge {
             background: #667eea;
             color: white;
@@ -52,7 +46,6 @@
             border-radius: 20px;
             font-size: 14px;
         }
-        
         .logout-btn {
             background: #dc3545;
             color: white;
@@ -63,31 +56,26 @@
             font-size: 14px;
             transition: background 0.3s;
         }
-        
         .logout-btn:hover {
             background: #c82333;
         }
-        
         .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
             margin-bottom: 30px;
         }
-        
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
             }
         }
-        
         .section {
             background: white;
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
         .section h2 {
             color: #333;
             margin-bottom: 20px;
@@ -95,7 +83,6 @@
             border-bottom: 2px solid #667eea;
             padding-bottom: 10px;
         }
-        
         .upload-area {
             border: 2px dashed #667eea;
             border-radius: 8px;
@@ -105,41 +92,33 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-        
         .upload-area:hover {
             border-color: #764ba2;
             background: #f0f2ff;
         }
-        
         .upload-area.dragover {
             border-color: #764ba2;
             background: #f0f2ff;
         }
-        
         .upload-area input[type="file"] {
             display: none;
         }
-        
         .upload-icon {
             font-size: 48px;
             margin-bottom: 10px;
         }
-        
         .upload-text {
             color: #667eea;
             font-weight: 600;
             margin-bottom: 5px;
         }
-        
         .upload-subtext {
             color: #666;
             font-size: 14px;
         }
-        
         .file-input-wrapper {
             margin-top: 20px;
         }
-        
         .file-input-label {
             display: inline-block;
             background: #667eea;
@@ -151,16 +130,13 @@
             font-size: 14px;
             font-weight: 600;
         }
-        
         .file-input-label:hover {
             background: #764ba2;
         }
-        
         .upload-progress {
             margin-top: 20px;
             display: none;
         }
-        
         .progress-bar {
             width: 100%;
             height: 8px;
@@ -168,49 +144,41 @@
             border-radius: 4px;
             overflow: hidden;
         }
-        
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
             width: 0%;
             transition: width 0.3s;
         }
-        
         .upload-status {
             margin-top: 10px;
             font-size: 14px;
             color: #666;
         }
-        
         .alert {
             padding: 12px 16px;
             border-radius: 6px;
             margin-bottom: 20px;
             font-size: 14px;
         }
-        
         .alert-success {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
-        
         .alert-error {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        
         .alert-info {
             background: #d1ecf1;
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
-        
         .documents-list {
             margin-top: 20px;
         }
-        
         .document-item {
             display: flex;
             justify-content: space-between;
@@ -221,42 +189,34 @@
             margin-bottom: 10px;
             transition: all 0.3s;
         }
-        
         .document-item:hover {
             border-color: #667eea;
             box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
         }
-        
         .document-info {
             flex: 1;
         }
-        
         .document-name {
             font-weight: 600;
             color: #333;
             margin-bottom: 5px;
             word-break: break-word;
         }
-        
         .document-meta {
             font-size: 12px;
             color: #999;
         }
-        
         .document-size {
             display: inline-block;
             margin-right: 15px;
         }
-        
         .document-date {
             display: inline-block;
         }
-        
         .document-actions {
             display: flex;
             gap: 10px;
         }
-        
         .btn {
             padding: 8px 12px;
             border: none;
@@ -266,76 +226,228 @@
             font-weight: 600;
             transition: all 0.3s;
         }
-        
         .btn-download {
             background: #667eea;
             color: white;
         }
-        
         .btn-download:hover {
             background: #5568d3;
         }
-        
         .btn-delete {
             background: #dc3545;
             color: white;
         }
-        
         .btn-delete:hover {
             background: #c82333;
         }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .btn-share {
+            background: #28a745;
+            color: white;
         }
-        
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #999;
+        .btn-share:hover {
+            background: #218838;
         }
-        
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
+
+        .btn-update {
+            background: #17a2b8;
+            color: white;
         }
-        
-        .empty-state-text {
-            font-size: 16px;
+
+        .btn-update:hover {
+            background: #138496;
         }
-        
+
+        .btn-audit {
+            background: #6f42c1;
+            color: white;
+        }
+
+        .btn-audit:hover {
+            background: #5a32a3;
+        }
+
+        /* Stats Styles */
         .stats {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
-            margin-bottom: 20px;
         }
-        
         .stat-box {
             background: #f8f9ff;
             padding: 15px;
-            border-radius: 6px;
+            border-radius: 8px;
             text-align: center;
-            border-left: 4px solid #667eea;
+            border: 1px solid #e0e0e0;
         }
-        
         .stat-number {
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 20px;
+            font-weight: 700;
             color: #667eea;
+            margin-bottom: 5px;
         }
-        
         .stat-label {
             font-size: 12px;
             color: #666;
-            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        
-        @media (max-width: 768px) {
-            .stats {
-                grid-template-columns: 1fr;
-            }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .empty-state-text {
+            font-size: 14px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .close-modal {
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .access-list {
+            margin-top: 25px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        .access-list h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .access-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9ff;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .access-user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .access-username {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .access-role {
+            font-size: 12px;
+            color: #666;
+            text-transform: capitalize;
+        }
+
+        .btn-revoke {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-revoke:hover {
+            background: #e0a800;
+        }
+
+        .audit-log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #eee;
+        }
+
+        .audit-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .audit-entry:last-child {
+            border-bottom: none;
         }
     </style>
 </head>
@@ -350,14 +462,11 @@
                 </form>
             </div>
         </header>
-        
         <div id="alerts"></div>
-        
         <div class="main-content">
             <!-- Upload Section -->
             <div class="section">
                 <h2>Upload Document</h2>
-                
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📤</div>
                     <div class="upload-text">Drag and drop your file here</div>
@@ -367,7 +476,6 @@
                         <label for="fileInput" class="file-input-label">Choose File</label>
                     </div>
                 </div>
-                
                 <div class="upload-progress" id="uploadProgress">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
@@ -375,7 +483,6 @@
                     <div class="upload-status" id="uploadStatus"></div>
                 </div>
             </div>
-            
             <!-- Stats Section -->
             <div class="section">
                 <h2>Your Documents</h2>
@@ -395,7 +502,6 @@
                 </div>
             </div>
         </div>
-        
         <!-- Documents List Section -->
         <div class="section">
             <h2>Shared Documents</h2>
@@ -407,39 +513,229 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Hidden file input for updating versions -->
+    <input type="file" id="updateVersionInput" style="display: none;">
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Access</h2>
+                <span class="close-modal" id="closeModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label for="shareTargetUser">Share with new user</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="shareTargetUser" placeholder="Enter username...">
+                    <select id="shareRole" style="width: 120px;">
+                        <option value="viewer">Viewer</option>
+                        <option value="editor">Editor</option>
+                    </select>
+                    <button class="btn btn-share" id="confirmShare">Share</button>
+                </div>
+            </div>
+
+            <div class="access-list">
+                <h3>Users with access</h3>
+                <div id="currentAccessList">
+                    <!-- Access items will be rendered here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-download" style="background: #6c757d;" id="cancelShare">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Modal -->
+    <div id="auditModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Document Activity Log</h2>
+                <span class="close-modal" id="closeAuditModal">&times;</span>
+            </div>
+            <div class="audit-log-container" id="auditLogContent">
+                <!-- Audit entries will be rendered here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-download" style="background: #6c757d;" id="closeAuditBtn">Close</button>
+            </div>
+        </div>
+    </div>
     <script>
         // API configuration
         const API_BASE = '';
-        
-        // Document list storage
+        // State
         let documents = [];
-        
+        let currentUsername = null;
+        let selectedDocId = null;
         // Initialize the page
         async function initializePage() {
             try {
                 // Load username from cookie or session
-                const username = await fetchUsername();
-                if (username) {
-                    document.getElementById('username-badge').textContent = `👤 ${username}`;
+                currentUsername = await fetchUsername();
+                if (currentUsername) {
+                    document.getElementById('username-badge').textContent = `👤 ${currentUsername}`;
                 } else {
                     window.location.href = '/';
                 }
-                
                 // Load documents
                 await loadDocuments();
+                // Setup modals
+                setupModal();
+                setupAuditModal();
+
+                // Setup update input
+                document.getElementById('updateVersionInput').addEventListener('change', handleUpdateFileSelect);
             } catch (error) {
                 showAlert('Error initializing page: ' + error.message, 'error');
             }
         }
-        
+        // Setup Modal Events
+        function setupModal() {
+            const modal = document.getElementById('shareModal');
+            const closeBtn = document.getElementById('closeModal');
+            const cancelBtn = document.getElementById('cancelShare');
+            const confirmBtn = document.getElementById('confirmShare');
+            const closeModal = () => {
+                modal.style.display = 'none';
+                document.getElementById('shareTargetUser').value = '';
+                selectedDocId = null;
+            };
+            closeBtn.onclick = closeModal;
+            cancelBtn.onclick = closeModal;
+            confirmBtn.onclick = async () => {
+                const targetUser = document.getElementById('shareTargetUser').value.trim();
+                const role = document.getElementById('shareRole').value;
+                if (!targetUser) {
+                    showAlert('Please enter a target username', 'error');
+                    return;
+                }
+                if (targetUser === currentUsername) {
+                    showAlert('You cannot share a document with yourself', 'error');
+                    return;
+                }
+                try {
+                    const response = await fetch(`${API_BASE}/api/documents/${selectedDocId}/share`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            target_username: targetUser,
+                            role: role
+                        }),
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        showAlert(`Document shared with ${targetUser} successfully!`, 'success');
+                        document.getElementById('shareTargetUser').value = '';
+                        await loadDocuments();
+                        renderAccessList(); // Re-render the list in modal
+                    } else {
+                        const error = await response.text();
+                        showAlert('Sharing failed: ' + error, 'error');
+                    }
+                } catch (error) {
+                    showAlert('Error sharing document: ' + error.message, 'error');
+                }
+            };
+        }
+
+        // Setup Audit Modal
+        function setupAuditModal() {
+            const modal = document.getElementById('auditModal');
+            const closeBtn = document.getElementById('closeAuditModal');
+            const closeBtnFooter = document.getElementById('closeAuditBtn');
+
+            const closeModal = () => {
+                modal.style.display = 'none';
+            };
+
+            closeBtn.onclick = closeModal;
+            closeBtnFooter.onclick = closeModal;
+        }
+
+        // Global click handler for modals
+        window.addEventListener('click', (event) => {
+            const shareModal = document.getElementById('shareModal');
+            const auditModal = document.getElementById('auditModal');
+            if (event.target === shareModal) {
+                shareModal.style.display = 'none';
+                document.getElementById('shareTargetUser').value = '';
+                selectedDocId = null;
+            } else if (event.target === auditModal) {
+                auditModal.style.display = 'none';
+            }
+        });
+
+        // Render Access List in Modal
+        function renderAccessList() {
+            const container = document.getElementById('currentAccessList');
+            const doc = documents.find(d => d.id === selectedDocId);
+            if (!doc || !doc.permissions || Object.keys(doc.permissions).length === 0) {
+                container.innerHTML = '<div style="color: #999; font-style: italic; font-size: 14px;">No other users have access yet.</div>';
+                return;
+            }
+            container.innerHTML = Object.entries(doc.permissions).map(([user, role]) => `
+                <div class="access-item">
+                    <div class="access-user-info">
+                        <span class="access-username">${escapeHtml(user)}</span>
+                        <span class="access-role">${escapeHtml(role)}</span>
+                    </div>
+                    <button class="btn btn-revoke" data-username="${escapeHtml(user)}">Revoke</button>
+                </div>
+            `).join('');
+
+            // Attach event listeners to revoke buttons
+            container.querySelectorAll('.btn-revoke').forEach(btn => {
+                btn.onclick = () => {
+                    const username = btn.getAttribute('data-username');
+                    // Note: getAttribute returns the attribute value as-is.
+                    // Since we escaped it when setting the HTML, it will be double-escaped if we aren't careful.
+                    // However, when the browser parses <button data-username="a&amp;b">,
+                    // el.getAttribute('data-username') returns "a&b" (the unescaped version).
+                    revokeAccess(username);
+                };
+            });
+        }
+
+        // Revoke Access
+        async function revokeAccess(targetUser) {
+            if (!confirm(`Are you sure you want to remove access for ${targetUser}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/documents/${selectedDocId}/share`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        target_username: targetUser
+                    }),
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    showAlert(`Access revoked for ${targetUser}`, 'success');
+                    await loadDocuments();
+                    renderAccessList();
+                } else {
+                    const error = await response.text();
+                    showAlert('Revocation failed: ' + error, 'error');
+                }
+            } catch (error) {
+                showAlert('Error revoking access: ' + error.message, 'error');
+            }
+        }
         // Fetch current username
         async function fetchUsername() {
             try {
                 const response = await fetch(`${API_BASE}/api/user`, {
                     credentials: 'include'
                 });
-                
                 if (response.ok) {
                     const data = await response.json();
                     return data.username;
@@ -450,14 +746,12 @@
                 return null;
             }
         }
-        
         // Load documents list
         async function loadDocuments() {
             try {
                 const response = await fetch(`${API_BASE}/api/documents`, {
                     credentials: 'include'
                 });
-                
                 if (response.ok) {
                     documents = await response.json();
                     renderDocuments();
@@ -469,11 +763,9 @@
                 showAlert('Error loading documents: ' + error.message, 'error');
             }
         }
-        
         // Render documents list
         function renderDocuments() {
             const listContainer = document.getElementById('documentsList');
-            
             if (documents.length === 0) {
                 listContainer.innerHTML = `
                     <div class="empty-state">
@@ -483,29 +775,37 @@
                 `;
                 return;
             }
-            
             const documentsHTML = documents.map(doc => {
                 const timestamp = doc.uploaded_at || doc.uploadedAt || doc.created_at;
                 const date = new Date(timestamp).toLocaleDateString();
                 const size = formatFileSize(doc.size);
-                
+                const isOwner = doc.uploaded_by === currentUsername;
+                // For non-owners, permissions map only contains their own entry
+                const myPerms = doc.permissions || {};
+                const isEditor = myPerms[currentUsername] === 'editor';
+                const version = doc.version || 1;
                 return `
                     <div class="document-item">
                         <div class="document-info">
-                            <div class="document-name">📄 ${escapeHtml(doc.filename)}</div>
+                            <div class="document-name">📄 ${escapeHtml(doc.filename)} <span style="font-size: 11px; background: #e9ecef; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">v${version}</span></div>
                             <div class="document-meta">
                                 <span class="document-size">${size}</span>
                                 <span class="document-date">Uploaded on ${date}</span>
+                                ${!isOwner ? `<span style="margin-left: 10px; color: #667eea; font-weight: 600;">(Shared by ${escapeHtml(doc.uploaded_by)})</span>` : ''}
                             </div>
                         </div>
                         <div class="document-actions">
                             <button class="btn btn-download" data-id="${escapeHtml(doc.id)}" data-filename="${escapeHtml(doc.filename)}">Download</button>
-                            <button class="btn btn-delete" data-id="${escapeHtml(doc.id)}">Delete</button>
+                            ${isOwner || isEditor ? `<button class="btn btn-update" data-id="${escapeHtml(doc.id)}">Update</button>` : ''}
+                            ${isOwner ? `
+                                <button class="btn btn-audit" data-id="${escapeHtml(doc.id)}">Audit Log</button>
+                                <button class="btn btn-share" data-id="${escapeHtml(doc.id)}">Share</button>
+                                <button class="btn btn-delete" data-id="${escapeHtml(doc.id)}">Delete</button>
+                            ` : ''}
                         </div>
                     </div>
                 `;
             }).join('');
-            
             listContainer.innerHTML = documentsHTML;
 
             // Attach event listeners
@@ -517,6 +817,28 @@
                 });
             });
 
+            listContainer.querySelectorAll('.btn-update').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    selectedDocId = btn.getAttribute('data-id');
+                    document.getElementById('updateVersionInput').click();
+                });
+            });
+
+            listContainer.querySelectorAll('.btn-audit').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const docId = btn.getAttribute('data-id');
+                    showAuditLog(docId);
+                });
+            });
+
+            listContainer.querySelectorAll('.btn-share').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    selectedDocId = btn.getAttribute('data-id');
+                    document.getElementById('shareModal').style.display = 'block';
+                    renderAccessList();
+                });
+            });
+
             listContainer.querySelectorAll('.btn-delete').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const docId = btn.getAttribute('data-id');
@@ -524,13 +846,104 @@
                 });
             });
         }
-        
+        // Show Audit Log
+        async function showAuditLog(docId) {
+            const container = document.getElementById('auditLogContent');
+            container.innerHTML = 'Loading activity log...';
+            document.getElementById('auditModal').style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/documents/${docId}/audit`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const auditLog = await response.json();
+                    if (!auditLog || auditLog.length === 0) {
+                        container.innerHTML = 'No activity recorded yet.';
+                    } else {
+                        container.innerHTML = auditLog.map(entry => `
+                            <div class="audit-entry">${escapeHtml(entry)}</div>
+                        `).join('');
+                    }
+                } else {
+                    const error = await response.text();
+                    container.innerHTML = `<div style="color: #dc3545;">Error loading audit log: ${escapeHtml(error)}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div style="color: #dc3545;">Error: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        // Handle update file select
+        function handleUpdateFileSelect(e) {
+            const file = e.target.files[0];
+            if (file && selectedDocId) {
+                updateDocument(selectedDocId, file);
+            }
+        }
+
+        // Update document
+        async function updateDocument(docId, file) {
+            const maxSize = 100 * 1024 * 1024; // 100MB limit
+            if (file.size > maxSize) {
+                showAlert(`File too large. Maximum size is ${formatFileSize(maxSize)}.`, 'error');
+                document.getElementById('updateVersionInput').value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadProgress = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const uploadStatus = document.getElementById('uploadStatus');
+            uploadProgress.style.display = 'block';
+            uploadStatus.textContent = 'Updating...';
+
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressFill.style.width = percentComplete + '%';
+                        uploadStatus.textContent = `Updating: ${percentComplete.toFixed(0)}%`;
+                    }
+                });
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        showAlert(`Document updated successfully!`, 'success');
+                        loadDocuments();
+                    } else {
+                        showAlert(xhr.responseText || 'Update failed', 'error');
+                    }
+                    uploadProgress.style.display = 'none';
+                    document.getElementById('updateVersionInput').value = '';
+                });
+                xhr.addEventListener('error', () => {
+                    showAlert('Update failed: ' + xhr.statusText, 'error');
+                    uploadProgress.style.display = 'none';
+                    document.getElementById('updateVersionInput').value = '';
+                });
+                xhr.addEventListener('abort', () => {
+                    showAlert('Update cancelled', 'info');
+                    uploadProgress.style.display = 'none';
+                    document.getElementById('updateVersionInput').value = '';
+                });
+                xhr.open('POST', `${API_BASE}/api/documents/${docId}/update`, true);
+                xhr.withCredentials = true;
+                xhr.send(formData);
+            } catch (error) {
+                showAlert('Error updating document: ' + error.message, 'error');
+                uploadProgress.style.display = 'none';
+            }
+        }
+
         // Update statistics
         function updateStats() {
             const totalDocs = documents.length;
             const totalBytes = documents.reduce((sum, doc) => sum + (doc.size || 0), 0);
             const totalSize = formatFileSize(totalBytes);
-            
             // Count documents uploaded in last 24 hours
             const now = Date.now();
             const oneDayMs = 24 * 60 * 60 * 1000;
@@ -539,17 +952,14 @@
                 const uploadTime = new Date(timestamp).getTime();
                 return (now - uploadTime) < oneDayMs;
             }).length;
-            
             document.getElementById('totalDocuments').textContent = totalDocs;
             document.getElementById('totalSize').textContent = totalSize;
             document.getElementById('recentCount').textContent = recentCount;
         }
-        
         // Setup upload area
         function setupUploadArea() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
-            
             // Click to upload
             uploadArea.addEventListener('click', (e) => {
                 // Prevent duplicate click if clicking on the label or input directly
@@ -557,63 +967,49 @@
                     fileInput.click();
                 }
             });
-            
             // Drag and drop
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadArea.classList.add('dragover');
             });
-            
             uploadArea.addEventListener('dragleave', () => {
                 uploadArea.classList.remove('dragover');
             });
-            
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
-                
                 if (e.dataTransfer.files.length > 0) {
                     fileInput.files = e.dataTransfer.files;
                     handleFileSelect();
                 }
             });
-            
             // File input change
             fileInput.addEventListener('change', handleFileSelect);
         }
-        
         // Handle file selection
         function handleFileSelect() {
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
-            
             if (file) {
                 uploadFile(file);
             }
         }
-        
         // Upload file
         async function uploadFile(file) {
             const maxSize = 100 * 1024 * 1024; // 100MB limit
-            
             if (file.size > maxSize) {
                 showAlert(`File too large. Maximum size is ${formatFileSize(maxSize)}.`, 'error');
                 return;
             }
-            
             const formData = new FormData();
             formData.append('file', file);
-            
             const uploadProgress = document.getElementById('uploadProgress');
             const progressFill = document.getElementById('progressFill');
             const uploadStatus = document.getElementById('uploadStatus');
-            
             uploadProgress.style.display = 'block';
             uploadStatus.textContent = 'Uploading...';
-            
             try {
                 const xhr = new XMLHttpRequest();
-                
                 // Track upload progress
                 xhr.upload.addEventListener('progress', (e) => {
                     if (e.lengthComputable) {
@@ -622,16 +1018,13 @@
                         uploadStatus.textContent = `Uploading: ${percentComplete.toFixed(0)}%`;
                     }
                 });
-                
                 xhr.addEventListener('load', async () => {
                     if (xhr.status === 200 || xhr.status === 201) {
                         uploadStatus.textContent = 'Upload complete!';
                         progressFill.style.width = '100%';
                         showAlert(`Document "${file.name}" uploaded successfully!`, 'success');
-                        
                         // Reset file input
                         document.getElementById('fileInput').value = '';
-                        
                         // Reload documents after a short delay
                         setTimeout(() => {
                             uploadProgress.style.display = 'none';
@@ -643,17 +1036,14 @@
                         uploadProgress.style.display = 'none';
                     }
                 });
-                
                 xhr.addEventListener('error', () => {
                     showAlert('Upload failed: ' + xhr.statusText, 'error');
                     uploadProgress.style.display = 'none';
                 });
-                
                 xhr.addEventListener('abort', () => {
                     showAlert('Upload cancelled', 'info');
                     uploadProgress.style.display = 'none';
                 });
-                
                 xhr.open('POST', `${API_BASE}/api/documents/upload`, true);
                 xhr.withCredentials = true;
                 xhr.send(formData);
@@ -662,7 +1052,6 @@
                 uploadProgress.style.display = 'none';
             }
         }
-        
         // Download document
         async function downloadDocument(docId, filename) {
             try {
@@ -672,23 +1061,22 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                // Reload documents after a short delay to see the download event in audit log
+                setTimeout(loadDocuments, 2000);
             } catch (error) {
                 showAlert('Error downloading file: ' + error.message, 'error');
             }
         }
-        
         // Delete document
         async function deleteDocument(docId) {
             if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
                 return;
             }
-            
             try {
                 const response = await fetch(`${API_BASE}/api/documents/${docId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
-                
                 if (response.ok) {
                     showAlert('Document deleted successfully', 'success');
                     loadDocuments();
@@ -702,20 +1090,16 @@
                 showAlert('Error deleting document: ' + error.message, 'error');
             }
         }
-        
         // Show alert
         function showAlert(message, type = 'info') {
             const alertsContainer = document.getElementById('alerts');
             const alertId = 'alert-' + Date.now();
-            
             const alertHTML = `
                 <div class="alert alert-${type}" id="${alertId}">
                     ${escapeHtml(message)}
                 </div>
             `;
-            
             alertsContainer.insertAdjacentHTML('beforeend', alertHTML);
-            
             // Auto-remove after 5 seconds
             setTimeout(() => {
                 const alert = document.getElementById(alertId);
@@ -724,7 +1108,6 @@
                 }
             }, 5000);
         }
-        
         // Utility functions
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 B';
@@ -733,7 +1116,6 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
         }
-        
         function escapeHtml(text) {
             const map = {
                 '&': '&amp;',
@@ -744,13 +1126,11 @@
             };
             return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
-        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             setupUploadArea();
             initializePage();
         });
-        
         // Refresh documents every 30 seconds
         setInterval(loadDocuments, 30000);
     </script>

@@ -7,3 +7,4 @@ data/users.json
 .env
 data/files/
 data/documents_metadata.json
+logs/access.log
