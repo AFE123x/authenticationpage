@@ -291,7 +291,7 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
     // save_users() deletes the file before renaming, so unprotected reads can see an empty store.
     let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
     let _guard = lock.lock().await;
-    let users = load_users();
+    let mut users = load_users();
 
     /* check if cookie already exists for user */
     if let Some(cookie) = jar.get("session_token") {
@@ -310,9 +310,32 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
         }
     }
 
-    match users.get(&form.username) {
-        Some(user) => match verify_password(&form.password, &user.password_hash) {
+    if let Some(user) = users.get_mut(&form.username) {
+        let now = chrono::Utc::now();
+
+        // Check if account is currently locked
+        if let Some(lock_time) = user.locked_until {
+            if now < lock_time {
+                warn!(target: "security", "Login rejected: Account {} is locked", form.username);
+                return (
+                    StatusCode::FORBIDDEN,
+                    Html("<h1>Account locked for 15 minutes</h1>"),
+                )
+                    .into_response();
+            } else {
+                // Lock expired, reset
+                user.failed_attempts = 0;
+                user.locked_until = None;
+            }
+        }
+
+        match verify_password(&form.password, &user.password_hash) {
             Ok(true) => {
+                // Successful login: Reset attempts and save
+                user.failed_attempts = 0;
+                user.locked_until = None;
+                let _ = save_users(&users);
+
                 let session_manager = SessionManager::new();
                 let token = session_manager.create_session(&form.username).await;
 
@@ -342,6 +365,14 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
                 (jar.add(cookie), Redirect::to("/share")).into_response()
             }
             Ok(false) => {
+                // Failed login: Increment counter
+                user.failed_attempts += 1;
+                if user.failed_attempts >= 5 {
+                    user.locked_until = Some(now + chrono::Duration::minutes(15));
+                    warn!(target: "security", "Account {} locked due to too many failed attempts", form.username);
+                }
+                let _ = save_users(&users);
+
                 // ← warn instead of info — invalid credentials are noteworthy
                 warn!(
                     target: "security",
@@ -361,19 +392,18 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
                 ); // ← log the error
                 (StatusCode::INTERNAL_SERVER_ERROR, Html("<h1>Error</h1>")).into_response()
             }
-        },
-        None => {
-            warn!(
-                target: "security",
-                "Login failed: unknown username: {}",
-                form.username
-            );
-            (
-                StatusCode::UNAUTHORIZED,
-                Html("<h1>Login Failed</h1><a href='/'>Back</a>"),
-            )
-                .into_response()
         }
+    } else {
+        warn!(
+            target: "security",
+            "Login failed: unknown username: {}",
+            form.username
+        );
+        (
+            StatusCode::UNAUTHORIZED,
+            Html("<h1>Login Failed</h1><a href='/'>Back</a>"),
+        )
+            .into_response()
     }
 }
 
@@ -521,6 +551,8 @@ async fn handle_register(jar: CookieJar, Form(form): Form<RegisterForm>) -> impl
         email: form.email.clone(),
         password_hash,
         role: UserRole::User,
+        failed_attempts: 0,
+        locked_until: None,
     };
     users.insert(form.username.clone(), user);
 
@@ -1527,6 +1559,8 @@ mod tests {
                 email: "test@example.com".to_string(),
                 password_hash: "dummy_hash".to_string(),
                 role: UserRole::User,
+                failed_attempts: 0,
+                locked_until: None,
             },
         );
         save_users(&users).expect("Failed to save test user");

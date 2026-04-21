@@ -64,6 +64,10 @@ pub struct User {
     pub password_hash: String,
     #[serde(default)]
     pub role: UserRole,
+    #[serde(default)]
+    pub failed_attempts: u32,
+    #[serde(default)]
+    pub locked_until: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 const USERS_FILE: &str = "data/users.json";
