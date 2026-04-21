@@ -5,3 +5,5 @@ data/sessions.json
 data/users.json
 *.pem
 .env
+data/files/
+data/documents_metadata.json
