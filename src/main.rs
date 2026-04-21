@@ -767,7 +767,17 @@ async fn api_list_documents(jar: CookieJar) -> impl IntoResponse {
         let session_manager = SessionManager::new();
 
         if let Some(session) = session_manager.validate_session(token).await {
-            let documents = get_user_documents(&session.user_id).await;
+            let users = crate::users::load_users();
+            let is_admin = users
+                .get(&session.user_id)
+                .map_or(false, |u| u.role == crate::users::UserRole::Admin);
+
+            let documents = if is_admin {
+                crate::documents::get_all_documents().await
+            } else {
+                get_user_documents(&session.user_id).await
+            };
+
             let response: Vec<DocumentResponse> = documents
                 .into_iter()
                 .map(|doc| {
@@ -782,7 +792,7 @@ async fn api_list_documents(jar: CookieJar) -> impl IntoResponse {
                         uploaded_by: doc.uploaded_by,
                         version: doc.version,
                         audit_log: None, // Always redact in list view
-                        permissions: if is_owner {
+                        permissions: if is_owner || is_admin {
                             Some(doc.permissions)
                         } else {
                             // Non-owners only see their own permission
@@ -1393,10 +1403,16 @@ async fn api_download_document(
         let session_manager = SessionManager::new();
 
         if let Some(session) = session_manager.validate_session(token).await {
+            let users = crate::users::load_users();
+            let is_admin = users
+                .get(&session.user_id)
+                .map_or(false, |u| u.role == crate::users::UserRole::Admin);
+
             // First check authorization and get path
             let auth_check = if let Some(doc) = get_document_by_id(&id).await {
                 if doc.uploaded_by == session.user_id
                     || doc.permissions.contains_key(&session.user_id)
+                    || is_admin
                 {
                     Ok((doc.path.clone(), doc.filename.clone()))
                 } else {

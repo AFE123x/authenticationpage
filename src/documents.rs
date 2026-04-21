@@ -186,7 +186,6 @@ pub async fn get_user_documents(username: &str) -> Vec<Document> {
     user_docs
 }
 
-#[allow(dead_code)]
 pub async fn get_all_documents() -> Vec<Document> {
     let _guard = get_lock().read().await;
     let documents = load_document_metadata_internal().await;
