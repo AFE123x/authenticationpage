@@ -1,5 +1,5 @@
 use axum::extract::DefaultBodyLimit;
-use axum::http::StatusCode;
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Redirect};
 use axum::{
     Form, Json, Router,
@@ -9,6 +9,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use axum_server::tls_rustls::RustlsConfig;
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -237,7 +238,23 @@ async fn main() {
             "/api/documents/{id}/update",
             post(api_update_document).layer(DefaultBodyLimit::max(100 * 1024 * 1024)),
         )
-        .route("/api/documents/{id}/audit", get(api_get_audit_log));
+        .route("/api/documents/{id}/audit", get(api_get_audit_log))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::STRICT_TRANSPORT_SECURITY,
+            header::HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_FRAME_OPTIONS,
+            header::HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_CONTENT_TYPE_OPTIONS,
+            header::HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CONTENT_SECURITY_POLICY,
+            header::HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"),
+        ));
 
     let port: u16 = env::var("PORTNUM")
         .ok()
@@ -1022,7 +1039,9 @@ async fn api_update_document(
                                         // On Windows, std::fs::rename fails if the destination already exists.
                                         // We attempt to remove it first.
                                         if std::path::Path::new(&document.path).exists() {
-                                            if let Err(e) = tokio::fs::remove_file(&document.path).await {
+                                            if let Err(e) =
+                                                tokio::fs::remove_file(&document.path).await
+                                            {
                                                 warn!(
                                                     "Could not remove existing document file '{}' before rename: {}. Attempting rename anyway.",
                                                     document.path, e
@@ -1089,9 +1108,7 @@ async fn api_update_document(
 
                                         info!(
                                             "Document {} successfully updated to version {} by {}",
-                                            id,
-                                            new_version,
-                                            session.user_id
+                                            id, new_version, session.user_id
                                         );
                                         return (
                                             StatusCode::OK,
