@@ -1731,6 +1731,8 @@ mod tests {
                 email: "admin@example.com".to_string(),
                 password_hash: "dummy_hash".to_string(),
                 role: UserRole::Admin,
+                failed_attempts: 0,
+                locked_until: None,
             },
         );
         users.insert(
@@ -1740,6 +1742,8 @@ mod tests {
                 email: "user@example.com".to_string(),
                 password_hash: "dummy_hash".to_string(),
                 role: UserRole::User,
+                failed_attempts: 0,
+                locked_until: None,
             },
         );
         save_users(&users).expect("Failed to save test users");
@@ -1795,6 +1799,8 @@ mod tests {
                 email: "another@example.com".to_string(),
                 password_hash: "dummy_hash".to_string(),
                 role: UserRole::User,
+                failed_attempts: 0,
+                locked_until: None,
             },
         );
         save_users(&users).unwrap();
