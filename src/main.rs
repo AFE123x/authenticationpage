@@ -27,8 +27,8 @@ use rand::{RngCore, thread_rng};
 mod log;
 use crate::log::init_log;
 use crate::users::{
-    LoginForm, RegisterForm, ResetPassword, User, UserRole, hash_password, load_users, save_users,
-    validate_email, validate_password, validate_username, verify_password,
+    LoginForm, RegisterForm, ResetPassword, USER_FILE_LOCK, User, UserRole, hash_password,
+    load_users, save_users, validate_email, validate_password, validate_username, verify_password,
 }; //add Registry if needed
 
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
@@ -239,6 +239,11 @@ async fn main() {
             post(api_update_document).layer(DefaultBodyLimit::max(100 * 1024 * 1024)),
         )
         .route("/api/documents/{id}/audit", get(api_get_audit_log))
+        .route("/api/admin/users", get(api_admin_list_users))
+        .route(
+            "/api/admin/users/{username}/role",
+            post(api_admin_update_role),
+        )
         .layer(SetResponseHeaderLayer::overriding(
             header::STRICT_TRANSPORT_SECURITY,
             header::HeaderValue::from_static("max-age=31536000; includeSubDomains"),
@@ -407,8 +412,6 @@ async fn handle_login(jar: CookieJar, Form(form): Form<LoginForm>) -> impl IntoR
     }
 }
 
-static USER_FILE_LOCK: OnceLock<TokioMutex<()>> = OnceLock::new();
-
 async fn handle_register(jar: CookieJar, Form(form): Form<RegisterForm>) -> impl IntoResponse {
     info!(target: "security", "Registration attempt for username: {}", form.username);
 
@@ -487,7 +490,11 @@ async fn handle_register(jar: CookieJar, Form(form): Form<RegisterForm>) -> impl
     };
 
     // Check for duplicate username/email before acquiring lock (optimization)
-    let users_check = load_users();
+    let users_check = {
+        let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+        let _guard = lock.lock().await;
+        load_users()
+    };
     if users_check.contains_key(&form.username) {
         warn!(
             target: "security",
@@ -736,6 +743,7 @@ async fn share_html(jar: CookieJar) -> impl IntoResponse {
 #[derive(Serialize, Deserialize)]
 struct UserResponse {
     username: String,
+    role: UserRole,
 }
 
 async fn api_get_user(jar: CookieJar) -> impl IntoResponse {
@@ -744,13 +752,20 @@ async fn api_get_user(jar: CookieJar) -> impl IntoResponse {
         let session_manager = SessionManager::new();
 
         if let Some(session) = session_manager.validate_session(token).await {
-            return (
-                StatusCode::OK,
-                Json(UserResponse {
-                    username: session.user_id,
-                }),
-            )
-                .into_response();
+            let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+            let _guard = lock.lock().await;
+            let users = load_users();
+
+            if let Some(user) = users.get(&session.user_id) {
+                return (
+                    StatusCode::OK,
+                    Json(UserResponse {
+                        username: session.user_id,
+                        role: user.role.clone(),
+                    }),
+                )
+                    .into_response();
+            }
         }
     }
 
@@ -759,6 +774,94 @@ async fn api_get_user(jar: CookieJar) -> impl IntoResponse {
         Json(serde_json::json!({"error": "Unauthorized"})),
     )
         .into_response()
+}
+
+#[derive(Serialize)]
+struct AdminUserResponse {
+    username: String,
+    email: String,
+    role: UserRole,
+}
+
+async fn api_admin_list_users(jar: CookieJar) -> impl IntoResponse {
+    if let Some(session_cookie) = jar.get("session_token") {
+        let token = session_cookie.value();
+        let session_manager = SessionManager::new();
+
+        if let Some(session) = session_manager.validate_session(token).await {
+            let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+            let _guard = lock.lock().await;
+            let users = load_users();
+
+            if let Some(user) = users.get(&session.user_id) {
+                if user.role != UserRole::Admin {
+                    warn!(target: "security", "Non-admin user '{}' attempted to list users", session.user_id);
+                    return (StatusCode::FORBIDDEN, "Only admins can list users").into_response();
+                }
+
+                let response: Vec<AdminUserResponse> = users
+                    .values()
+                    .map(|u| AdminUserResponse {
+                        username: u.username.clone(),
+                        email: u.email.clone(),
+                        role: u.role.clone(),
+                    })
+                    .collect();
+                return (StatusCode::OK, Json(response)).into_response();
+            }
+        }
+    }
+    (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+}
+
+#[derive(Deserialize)]
+struct UpdateRoleForm {
+    role: UserRole,
+}
+
+async fn api_admin_update_role(
+    jar: CookieJar,
+    AxumPath(username): AxumPath<String>,
+    Json(payload): Json<UpdateRoleForm>,
+) -> impl IntoResponse {
+    if let Some(session_cookie) = jar.get("session_token") {
+        let token = session_cookie.value();
+        let session_manager = SessionManager::new();
+
+        if let Some(session) = session_manager.validate_session(token).await {
+            // Prevent users from changing their own role
+            if username == session.user_id {
+                warn!(target: "security", "User '{}' attempted to change their own role", session.user_id);
+                return (StatusCode::BAD_REQUEST, "You cannot change your own role")
+                    .into_response();
+            }
+
+            let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+            let _guard = lock.lock().await;
+            let mut users = load_users();
+
+            if let Some(current_user) = users.get(&session.user_id) {
+                if current_user.role != UserRole::Admin {
+                    warn!(target: "security", "Non-admin user '{}' attempted to update role for '{}'", session.user_id, username);
+                    return (StatusCode::FORBIDDEN, "Only admins can update roles").into_response();
+                }
+
+                if let Some(target_user) = users.get_mut(&username) {
+                    target_user.role = payload.role.clone();
+                    if let Err(e) = save_users(&users) {
+                        error!("Failed to save users after role update: {}", e);
+                        return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save users")
+                            .into_response();
+                    }
+                    info!(target: "security", "User '{}' role updated to '{:?}' by admin '{}'", username, payload.role, session.user_id);
+                    return (StatusCode::OK, "Role updated successfully").into_response();
+                } else {
+                    return (StatusCode::NOT_FOUND, "User not found").into_response();
+                }
+            }
+        }
+    }
+    (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
 }
 
 async fn api_list_documents(jar: CookieJar) -> impl IntoResponse {
@@ -1567,6 +1670,9 @@ mod tests {
     async fn test_session_lifecycle() {
         // Create a test user in the user store so session validation can find it
         let user_id = "test_user";
+        let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+        let _guard = lock.lock().await;
+
         let mut users = load_users();
         users.insert(
             user_id.to_string(),
@@ -1580,6 +1686,7 @@ mod tests {
             },
         );
         save_users(&users).expect("Failed to save test user");
+        drop(_guard);
 
         // Use a unique temp file to avoid interfering with production data or parallel tests
         let temp_file = format!("test_sessions_{}.json", random::<u64>());
@@ -1602,8 +1709,116 @@ mod tests {
 
         // Clean up: remove the temp file and test user
         let _ = std::fs::remove_file(&temp_file);
+        let _guard = lock.lock().await;
         let mut users = load_users();
         users.remove(user_id);
+        let _ = save_users(&users);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_admin_access_control() {
+        let admin_id = "admin_user";
+        let user_id = "regular_user";
+        let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+        let _guard = lock.lock().await;
+
+        let mut users = load_users();
+
+        users.insert(
+            admin_id.to_string(),
+            User {
+                username: admin_id.to_string(),
+                email: "admin@example.com".to_string(),
+                password_hash: "dummy_hash".to_string(),
+                role: UserRole::Admin,
+            },
+        );
+        users.insert(
+            user_id.to_string(),
+            User {
+                username: user_id.to_string(),
+                email: "user@example.com".to_string(),
+                password_hash: "dummy_hash".to_string(),
+                role: UserRole::User,
+            },
+        );
+        save_users(&users).expect("Failed to save test users");
+        drop(_guard);
+
+        let session_manager = SessionManager::new();
+        let admin_token = session_manager.create_session(admin_id).await;
+        let user_token = session_manager.create_session(user_id).await;
+
+        // Helper to simulate request with cookie
+        async fn check_list_users(token: &str) -> StatusCode {
+            let jar = CookieJar::new().add(Cookie::new("session_token", token.to_string()));
+            let response = api_admin_list_users(jar).await.into_response();
+            response.status()
+        }
+
+        async fn check_update_role(token: &str, target: &str, new_role: UserRole) -> StatusCode {
+            let jar = CookieJar::new().add(Cookie::new("session_token", token.to_string()));
+            let payload = Json(UpdateRoleForm { role: new_role });
+            let response = api_admin_update_role(jar, AxumPath(target.to_string()), payload)
+                .await
+                .into_response();
+            response.status()
+        }
+
+        // Test 1: Admin can list users
+        assert_eq!(check_list_users(&admin_token).await, StatusCode::OK);
+
+        // Test 2: Regular user cannot list users
+        assert_eq!(check_list_users(&user_token).await, StatusCode::FORBIDDEN);
+
+        // Test 3: Admin can update role
+        assert_eq!(
+            check_update_role(&admin_token, user_id, UserRole::Admin).await,
+            StatusCode::OK
+        );
+
+        // Verify role was updated
+        let updated_users = {
+            let _guard = lock.lock().await;
+            load_users()
+        };
+        assert_eq!(updated_users.get(user_id).unwrap().role, UserRole::Admin);
+
+        // Test 4: Regular user (even if upgraded, let's use another user) cannot update role
+        let another_user_id = "another_user";
+        let _guard = lock.lock().await;
+        let mut users = load_users();
+        users.insert(
+            another_user_id.to_string(),
+            User {
+                username: another_user_id.to_string(),
+                email: "another@example.com".to_string(),
+                password_hash: "dummy_hash".to_string(),
+                role: UserRole::User,
+            },
+        );
+        save_users(&users).unwrap();
+        drop(_guard);
+
+        let another_user_token = session_manager.create_session(another_user_id).await;
+
+        assert_eq!(
+            check_update_role(&another_user_token, admin_id, UserRole::User).await,
+            StatusCode::FORBIDDEN
+        );
+
+        // Test 5: Admin cannot change their own role
+        assert_eq!(
+            check_update_role(&admin_token, admin_id, UserRole::User).await,
+            StatusCode::BAD_REQUEST
+        );
+
+        // Clean up
+        let _guard = lock.lock().await;
+        let mut users = load_users();
+        users.remove(admin_id);
+        users.remove(user_id);
+        users.remove(another_user_id);
         let _ = save_users(&users);
     }
 }

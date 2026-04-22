@@ -7,7 +7,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
+use tokio::sync::Mutex as TokioMutex;
 use tracing::error;
+
+// Global lock to synchronize all user file read-modify-write operations
+pub static USER_FILE_LOCK: OnceLock<TokioMutex<()>> = OnceLock::new();
 
 #[derive(Deserialize)]
 pub struct LoginForm {
