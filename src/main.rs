@@ -259,6 +259,14 @@ async fn main() {
         .layer(SetResponseHeaderLayer::overriding(
             header::CONTENT_SECURITY_POLICY,
             header::HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::REFERRER_POLICY,
+            header::HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::HeaderName::from_static("permissions-policy"),
+            header::HeaderValue::from_static("geolocation=(), microphone=(), camera=(), interest-cohort=()"),
         ));
 
     let port: u16 = env::var("PORTNUM")
