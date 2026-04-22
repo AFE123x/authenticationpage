@@ -9,6 +9,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use axum_server::tls_rustls::RustlsConfig;
+use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use serde::{Deserialize, Serialize};
@@ -244,6 +245,7 @@ async fn main() {
             "/api/admin/users/{username}/role",
             post(api_admin_update_role),
         )
+        .nest_service("/static", ServeDir::new("./static"))
         .layer(SetResponseHeaderLayer::overriding(
             header::STRICT_TRANSPORT_SECURITY,
             header::HeaderValue::from_static("max-age=31536000; includeSubDomains"),
@@ -258,7 +260,7 @@ async fn main() {
         ))
         .layer(SetResponseHeaderLayer::overriding(
             header::CONTENT_SECURITY_POLICY,
-            header::HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"),
+            header::HeaderValue::from_static("default-src 'self'; style-src 'self' 'unsafe-inline';"),
         ))
         .layer(SetResponseHeaderLayer::overriding(
             header::REFERRER_POLICY,
