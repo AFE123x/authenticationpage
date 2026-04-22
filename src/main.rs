@@ -1606,6 +1606,119 @@ mod tests {
         users.remove(user_id);
         let _ = save_users(&users);
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_admin_access_control() {
+        let admin_id = "admin_user";
+        let user_id = "regular_user";
+        let lock = USER_FILE_LOCK.get_or_init(|| TokioMutex::new(()));
+        let _guard = lock.lock().await;
+
+        let mut users = load_users();
+
+        users.insert(
+            admin_id.to_string(),
+            User {
+                username: admin_id.to_string(),
+                email: "admin@example.com".to_string(),
+                password_hash: "dummy_hash".to_string(),
+                role: UserRole::Admin,
+                failed_attempts: 0,
+                locked_until: None,
+            },
+        );
+        users.insert(
+            user_id.to_string(),
+            User {
+                username: user_id.to_string(),
+                email: "user@example.com".to_string(),
+                password_hash: "dummy_hash".to_string(),
+                role: UserRole::User,
+                failed_attempts: 0,
+                locked_until: None,
+            },
+        );
+        save_users(&users).expect("Failed to save test users");
+        drop(_guard);
+
+        let session_manager = SessionManager::new();
+        let admin_token = session_manager.create_session(admin_id).await;
+        let user_token = session_manager.create_session(user_id).await;
+
+        // Helper to simulate request with cookie
+        async fn check_list_users(token: &str) -> StatusCode {
+            let jar = CookieJar::new().add(Cookie::new("session_token", token.to_string()));
+            let response = api_admin_list_users(jar).await.into_response();
+            response.status()
+        }
+
+        async fn check_update_role(token: &str, target: &str, new_role: UserRole) -> StatusCode {
+            let jar = CookieJar::new().add(Cookie::new("session_token", token.to_string()));
+            let payload = Json(UpdateRoleForm { role: new_role });
+            let response = api_admin_update_role(jar, AxumPath(target.to_string()), payload)
+                .await
+                .into_response();
+            response.status()
+        }
+
+        // Test 1: Admin can list users
+        assert_eq!(check_list_users(&admin_token).await, StatusCode::OK);
+
+        // Test 2: Regular user cannot list users
+        assert_eq!(check_list_users(&user_token).await, StatusCode::FORBIDDEN);
+
+        // Test 3: Admin can update role
+        assert_eq!(
+            check_update_role(&admin_token, user_id, UserRole::Admin).await,
+            StatusCode::OK
+        );
+
+        // Verify role was updated
+        let updated_users = {
+            let _guard = lock.lock().await;
+            load_users()
+        };
+        assert_eq!(updated_users.get(user_id).unwrap().role, UserRole::Admin);
+
+        // Test 4: Regular user (even if upgraded, let's use another user) cannot update role
+        let another_user_id = "another_user";
+        let _guard = lock.lock().await;
+        let mut users = load_users();
+        users.insert(
+            another_user_id.to_string(),
+            User {
+                username: another_user_id.to_string(),
+                email: "another@example.com".to_string(),
+                password_hash: "dummy_hash".to_string(),
+                role: UserRole::User,
+                failed_attempts: 0,
+                locked_until: None,
+            },
+        );
+        save_users(&users).unwrap();
+        drop(_guard);
+
+        let another_user_token = session_manager.create_session(another_user_id).await;
+
+        assert_eq!(
+            check_update_role(&another_user_token, admin_id, UserRole::User).await,
+            StatusCode::FORBIDDEN
+        );
+
+        // Test 5: Admin cannot change their own role
+        assert_eq!(
+            check_update_role(&admin_token, admin_id, UserRole::User).await,
+            StatusCode::BAD_REQUEST
+        );
+
+        // Clean up
+        let _guard = lock.lock().await;
+        let mut users = load_users();
+        users.remove(admin_id);
+        users.remove(user_id);
+        users.remove(another_user_id);
+        let _ = save_users(&users);
+    }
 }
 
 async fn reset_password_html() -> Html<String> {
